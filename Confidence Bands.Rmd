@@ -1,0 +1,116 @@
+---
+title: "Simulation Based Study of Kaplan-meier and Nelson Aalen Estimators"
+subtitle: "KM_NA"
+author: 
+  - "Theophilus G. Baidoo"
+date: "`r format(Sys.Date(), '%B %d, %Y')`"
+output:
+  bookdown::pdf_document2:
+    fig_caption: true
+    latex_engine: xelatex
+    number_sections: true
+    toc: true
+    toc_depth: 4
+header-includes:
+  - \usepackage{amsmath}
+  - \usepackage{amssymb}
+  - \usepackage{amsfonts}
+  - \usepackage{amsthm}
+  - \usepackage{floatrow}
+  - \usepackage{fancyhdr}
+  - \pagestyle{fancy}
+  - \fancyhf{}
+  - \rhead{Theophilus Baidoo}
+  - \lhead{Survival Analysis Simulations"}
+  - \cfoot{\thepage}
+  - \usepackage{algorithm}
+  - \usepackage[noend]{algpseudocode}
+geometry: margin=0.8in
+fontsize: 10pt
+params:
+  proj_number: I
+  proj_title: "Survival Aanalysis Simulations"
+---
+
+# Confidence Bands
+
+```{r}
+library(survival)
+library(km.ci)
+library(ggplot2)
+```
+
+
+```{r}
+data(cancer, package="survival")
+
+head(colon)
+```
+
+
+```{r}
+# Time is divided by 365.25 to convert days into years
+sfit <- survfit(Surv(time / 365.25, status) ~ 1, data = colon)
+
+# Compute Hall-Wellner confidence bands
+sfit_hall_wellner <- km.ci(sfit, conf.level = 0.95, method = "hall-wellner")
+
+# Compute Equal-Precision confidence bands
+sfit_epband <- km.ci(sfit, conf.level = 0.95, method = "epband")
+
+
+pointwise_data <- data.frame(
+  time = sfit$time,
+  surv = sfit$surv,
+  lower = sfit$lower,
+  upper = sfit$upper
+)
+
+
+hall_wellner_data <- data.frame(
+  time = sfit_hall_wellner$time,
+  surv = sfit_hall_wellner$surv,
+  lower = sfit_hall_wellner$lower,
+  upper = sfit_hall_wellner$upper
+)
+
+
+epband_data <- data.frame(
+  time = sfit_epband$time,
+  surv = sfit_epband$surv,
+  lower = sfit_epband$lower,
+  upper = sfit_epband$upper
+)
+
+
+ggplot() +
+ 
+  geom_step(data = pointwise_data, aes(x = time, y = surv), color = "black", linewidth = 1, linetype = "solid") +
+  
+  
+  geom_ribbon(data = pointwise_data, aes(x = time, ymin = lower, ymax = upper, fill = "Pointwise CI"), alpha = 0.2) +
+  
+  
+  geom_ribbon(data = hall_wellner_data, aes(x = time, ymin = lower, ymax = upper, fill = "Hall-Wellner"), alpha = 0.2) +
+  
+  
+  geom_ribbon(data = epband_data, aes(x = time, ymin = lower, ymax = upper, fill = "Equal-Precision"), alpha = 0.2) +
+  
+  
+  scale_fill_manual(
+    values = c(
+      "Pointwise CI" = "green",
+      "Hall-Wellner" = "blue",
+      "Equal-Precision" = "red"
+    ),
+    name = "Confidence Bands"
+  ) +
+  labs(
+    title = "Kaplan-Meier Survival Curve with Confidence Intervals and Bands",
+    x = "Time (Years)",
+    y = "Survival Probability"
+  ) +
+  theme_minimal()
+
+```
+
