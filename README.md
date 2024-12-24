@@ -1,1 +1,4 @@
 # Simulation-Based-Study-of-KM-and-NA-Estimators-with-Confidence-Bands-for-KM
+
+## Abstract
+This study conducts an extensive simulation-based evaluation of the Kaplan-Meier and Nelson-Aalen estimators within the context of nonparametric survival analysis. Performance metrics, including mean squared error and bias, are employed to assess the estimators under varying censoring rates, sample sizes, and survival time distributions, with censoring times generated to reflect realistic conditions. Furthermore, the Hall-Wellner and equal precision confidence bands for the Kaplan-Meier estimator are analyzed, providing a comprehensive examination of its accuracy and reliability. The findings highlight the estimators’ strengths and limitations, offering valuable insights into their practical applicability in survival analysis.
