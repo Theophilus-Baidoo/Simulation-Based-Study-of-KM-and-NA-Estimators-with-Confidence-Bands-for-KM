@@ -1,0 +1,173 @@
+---
+title: "Simulation Based Study of Kaplan-meier and Nelson Aalen Estimators"
+subtitle: "KM_NA"
+author: 
+  - "Theophilus G. Baidoo"
+date: "`r format(Sys.Date(), '%B %d, %Y')`"
+output:
+  bookdown::pdf_document2:
+    fig_caption: true
+    latex_engine: xelatex
+    number_sections: true
+    toc: true
+    toc_depth: 4
+header-includes:
+  - \usepackage{amsmath}
+  - \usepackage{amssymb}
+  - \usepackage{amsfonts}
+  - \usepackage{amsthm}
+  - \usepackage{floatrow}
+  - \usepackage{fancyhdr}
+  - \pagestyle{fancy}
+  - \fancyhf{}
+  - \rhead{Theophilus Baidoo}
+  - \lhead{Survival Analysis Simulations"}
+  - \cfoot{\thepage}
+  - \usepackage{algorithm}
+  - \usepackage[noend]{algpseudocode}
+geometry: margin=0.8in
+fontsize: 10pt
+params:
+  proj_number: I
+  proj_title: "Survival Aanalysis Simulations"
+---
+
+# Log-normal Distribution
+
+
+```{r}
+library(stats)
+library(ggplot2)
+library(survival)
+library(km.ci)
+library(officer)
+library(rvg)
+library(dplyr)
+```
+
+
+```{r}
+meanlog <- 0  # Mean parameter for log-normal distribution
+sdlog <- 1    # Standard deviation for log-normal distribution
+censoring_rates <- c(0, 0.3, 0.5, 0.7)
+n_values <- c(20, 50, 150)  
+n_simulations <- 10000
+```
+
+
+```{r}
+# Define the log-normal CDF and its inverse
+F <- function(x) plnorm(x, meanlog = meanlog, sdlog = sdlog)
+Finv <- function(p) qlnorm(p, meanlog = meanlog, sdlog = sdlog)
+
+
+doc <- read_docx()
+
+
+pdf("LogNormal_KM_NA_Plots.pdf", width = 8, height = 6)
+
+
+for (n in n_values) {
+  for (censoring_rate in censoring_rates) {
+    # Initialize vectors to store results
+    probs_km <- numeric(19)
+    probs2_km <- numeric(19)
+    probs_na <- numeric(19)
+    probs2_na <- numeric(19)
+    
+    
+    for (sim in 1:n_simulations) {
+      T <- rlnorm(n, meanlog = meanlog, sdlog = sdlog)
+      if (censoring_rate > 0) {
+        C <- rexp(n, censoring_rate)
+      } else {
+        C <- rep(Inf, n)  # No censoring
+      }
+      
+      Y <- pmin(T, C)
+      S <- as.numeric(Y == T)
+      
+     
+      km_fit <- survfit(Surv(Y, S) ~ 1)
+      na_fit <- survfit(Surv(Y, S) ~ 1, type = "fh")
+      
+      quantiles <- seq(0.05, 0.95, by = 0.05)
+      time_points <- Finv(quantiles)
+      
+      
+      km_probs <- approx(km_fit$time, km_fit$surv, xout = time_points, rule = 2)$y
+      na_probs <- approx(na_fit$time, na_fit$surv, xout = time_points, rule = 2)$y
+      
+      for (i in 1:19) {
+        km_value <- km_probs[i]
+        na_value <- na_probs[i]
+        probs_km[i] <- probs_km[i] + km_value
+        probs2_km[i] <- probs2_km[i] + km_value^2
+        probs_na[i] <- probs_na[i] + na_value
+        probs2_na[i] <- probs2_na[i] + na_value^2
+      }
+    }
+    
+   
+    bias_km <- probs_km / n_simulations - (1 - quantiles)
+    mse_km <- bias_km^2 + (probs2_km / n_simulations) - (probs_km / n_simulations)^2
+    bias_na <- probs_na / n_simulations - (1 - quantiles)
+    mse_na <- bias_na^2 + (probs2_na / n_simulations) - (probs_na / n_simulations)^2
+    
+ 
+    plot_data_mse <- data.frame(
+      Quantile = rep(quantiles, 2),
+      MSE = c(mse_km, mse_na),
+      Estimator = rep(c("Kaplan-Meier", "Nelson-Aalen"), each = 19)
+    )
+    
+    plot_data_bias <- data.frame(
+      Quantile = rep(quantiles, 2),
+      Bias = c(bias_km, bias_na),
+      Estimator = rep(c("Kaplan-Meier", "Nelson-Aalen"), each = 19)
+    )
+    
+  
+    mse_plot <- ggplot(plot_data_mse, aes(x = Quantile, y = MSE, color = Estimator)) +
+      geom_line(size = 1) +
+      geom_point(size = 2) +
+      scale_color_manual(values = c("Kaplan-Meier" = "red", "Nelson-Aalen" = "blue")) +
+      ggtitle(paste("MSE of KM and NA Estimators\n(Censoring Rate =", censoring_rate, ", Sample Size =", n, ")")) +
+      xlab("Quantile") +
+      ylab("MSE") +
+      theme_minimal() +
+      theme(plot.title = element_text(hjust = 0.5, size = 16, face = "bold"))
+    
+    
+    bias_plot <- ggplot(plot_data_bias, aes(x = Quantile, y = Bias, color = Estimator)) +
+      geom_line(size = 1) +
+      geom_point(size = 2) +
+      scale_color_manual(values = c("Kaplan-Meier" = "red", "Nelson-Aalen" = "blue")) +
+      ggtitle(paste("Bias of Kaplan-Meier and Nelson-Aalen Estimators at Quantiles\n(Censoring Rate =", censoring_rate, ", Sample Size =", n, ")")) +
+      xlab("Quantile") +
+      ylab("Bias") +
+      theme_minimal() +
+      theme(plot.title = element_text(hjust = 0.5, size = 16, face = "bold")) 
+    #+
+     # annotate("text", x = 0.9, y = max(bias_km, bias_na) * 1.05, label = custom_label, hjust = 1, vjust = 1, size = 4, color = "black")
+    
+  
+    print(mse_plot)
+    print(bias_plot)
+    
+
+    doc <- doc %>%
+      body_add_par(paste("MSE Plot: Censoring Rate =", censoring_rate, ", Sample Size =", n), style = "heading 1") %>%
+      body_add_gg(mse_plot, width = 6, height = 4) %>%
+      body_add_par(paste("Bias Plot: Censoring Rate =", censoring_rate, ", Sample Size =", n), style = "heading 1") %>%
+      body_add_gg(bias_plot, width = 6, height = 4)
+  }
+}
+
+
+dev.off()
+
+
+print(doc, target = "LogNormal_KM_NA_Plots.docx")
+```
+
